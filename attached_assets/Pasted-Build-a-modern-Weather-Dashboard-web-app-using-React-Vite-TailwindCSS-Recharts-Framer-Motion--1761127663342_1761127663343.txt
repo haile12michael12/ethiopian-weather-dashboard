@@ -1,0 +1,93 @@
+Build a modern Weather Dashboard web app using React (Vite + TailwindCSS + Recharts + Framer Motion) as the frontend.
+The app will fetch weather data from a FastAPI backend that serves weather data scraped with Python (or stored in a local CSV).
+
+🎯 Requirements:
+
+Tech Stack
+
+Frontend: React (Vite), TailwindCSS, Axios, Recharts, Framer Motion
+
+Backend: FastAPI (Python), Pandas (for reading weather_data.csv), CORS enabled
+
+Frontend Features
+
+Responsive dashboard layout (use grid/flexbox)
+
+Header bar with:
+
+App title “🌍 Weather Dashboard”
+
+Search input for entering city name
+
+Dark/light mode toggle
+
+Current Weather Card showing:
+
+Temperature, city, condition icon (☀️/☁️/🌧️)
+
+Short description (“Cloudy”, “Sunny”, etc.)
+
+Animated temperature display using Framer Motion
+
+Charts Section:
+
+Line chart for temperature trend (7-day or hourly data)
+
+Bar chart for humidity trend (optional)
+
+Stats Grid of mini cards showing:
+
+Humidity
+
+Wind Speed
+
+Pressure
+
+Feels Like temperature
+
+Visibility
+
+Optional Map View using Leaflet.js (or placeholder card)
+
+Smooth animations on hover and page load
+
+Backend Features
+
+Endpoint: /api/weather
+
+Reads weather_data.csv (or mock JSON) and returns records as JSON
+
+Example JSON structure:
+
+[
+  {"city": "Addis Ababa", "date": "2025-10-20", "temperature": 25, "humidity": 60, "wind_speed": 12, "pressure": 1015, "condition": "Cloudy"}
+]
+
+
+Frontend API Integration
+
+Fetch from http://127.0.0.1:8000/api/weather using Axios
+
+Display latest data on dashboard cards and charts
+
+Handle loading and error states gracefully
+
+Advanced Enhancements
+
+Real-time auto-refresh every 5 minutes
+
+Dark/light mode persistence with localStorage
+
+Add Framer Motion animations for chart transitions and card appearance
+
+Add skeleton loaders while fetching data
+
+Optional: Allow switching between Celsius and Fahrenheit
+
+Bonus
+
+Use Tailwind gradients and glassmorphism effects
+
+Include a footer with “Built with ❤️ using React + FastAPI”
+
+Code should be modular: components for Header, CurrentWeather, WeatherChart, StatsGrid, MapView

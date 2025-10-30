@@ -7,13 +7,16 @@ import requests.exceptions as requests_exceptions
 import csv
 import sqlite3
 from bs4 import BeautifulSoup
+from .utils.config import Config
 
 forcast_URL = 'http://www.ethiomet.gov.et/forecasts/three_day_forecast' 
-home_directory = os.path.expanduser( '~' )
-forcast_FOLDER = os.path.join(home_directory, "airflow","harvestedfiles")
 
 def get_forcasts_scraper():
     try:
+        # Create database directory
+        forcast_FOLDER = Config.create_database_directory()
+        DATABASE_PATH = Config.get_database_path()
+        
         threeDayspage = requests.get(forcast_URL)
         dfs = pd.read_html(threeDayspage.text)[2]
         pages = requests.get(forcast_URL)
@@ -89,7 +92,7 @@ def get_forcasts_scraper():
         df.to_csv(df_csv_file, index=False, encoding='utf-8')
         fileOpenTwo = open(f'{df_csv_file}')
         ContentRead = csv.reader(fileOpenTwo)
-        conn = sqlite3.connect(f'{forcast_FOLDER}/NMA_Threedays_forcast_DataBase.db', timeout=20)
+        conn = sqlite3.connect(DATABASE_PATH, timeout=20)
         cursor = conn.cursor()
         create_table = '''CREATE TABLE IF NOT EXISTS NMAthreedaysForcasetData(
                 RecNum INTEGER PRIMARY KEY AUTOINCREMENT,
