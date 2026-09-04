@@ -1,127 +1,74 @@
-# Ethiopian Weather Dashboard
+# NMA Weather Dashboard
 
-A React-based weather dashboard that displays three-day weather forecasts for major Ethiopian cities. The application scrapes data from the National Meteorology Agency of Ethiopia and presents it in an intuitive, responsive interface.
-
-## Features
-
-- Displays three-day weather forecasts for major Ethiopian cities
-- Responsive design that works on desktop and mobile devices
-- Clean, modern UI with weather icons
-- Real-time data from National Meteorology Agency of Ethiopia
-
-## Project Structure
+Full-stack project built around the existing Airflow scraper
+(`airflow/NMA_web_Scrapping.py`), which pulls Ethiopia's National
+Meteorology Agency three-day forecast into a SQLite table
+(`NMAthreedaysForcasetData`) once a day.
 
 ```
-ethiopian-weather-dashboard/
-├── backend/
-│   ├── NMA_web_Scrapping.py  # Web scraping script
-│   ├── api.py                # Flask API server
-│   └── requirements.txt      # Backend dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── components/       # React components
-│   │   ├── hooks/            # Custom React hooks
-│   │   ├── services/         # API service functions
-│   │   ├── App.jsx           # Main App component
-│   │   └── main.jsx          # Entry point
-│   ├── index.html            # HTML template
-│   └── package.json          # Frontend dependencies
-└── README.md
+nma-weather-dashboard/
+├── airflow/
+│   └── NMA_web_Scrapping.py   # your existing DAG, unmodified
+├── backend/                    # FastAPI service reading the SQLite table
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── regions.py
+│   │   └── routes/forecast.py
+│   ├── seed_db.py               # local sample DB for dev/testing
+│   ├── requirements.txt
+│   └── README.md
+└── frontend/                   # React + Vite dashboard
+    ├── src/
+    │   ├── App.jsx
+    │   ├── theme.js
+    │   ├── api/forecast.js
+    │   ├── data/sampleCities.js
+    │   └── components/
+    ├── package.json
+    └── README.md
 ```
 
-## Prerequisites
+## How the pieces connect
 
-- Python 3.7+
-- Node.js 14+
-- npm or yarn
+1. **Airflow DAG** (`airflow/NMA_web_Scrapping.py`) runs daily, scrapes
+   ethiomet.gov.et, and appends a row per city to
+   `~/airflow/harvestedfiles/NMA_Threedays_forcast_DataBase.db`.
+2. **Backend** (`backend/`) is a small FastAPI service that reads the
+   *latest* row per city from that same SQLite file and serves it as JSON
+   at `GET /api/forecast`.
+3. **Frontend** (`frontend/`) is a React dashboard that calls that endpoint
+   and renders a searchable, filterable grid of cities plus a hero panel
+   with a 3-day high/low trend chart. If the API isn't reachable, it falls
+   back to bundled sample data so the UI is never blank.
 
-## Setup Instructions
+## Quickstart (sample data, no Airflow needed)
 
-### Backend Setup
-
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-   Or install them individually:
-   ```bash
-   pip install flask flask-cors
-   ```
-
-3. Run the web scraping script to collect weather data:
-   ```bash
-   python NMA_web_Scrapping.py
-   ```
-
-4. Start the Flask API server:
-   ```bash
-   python api.py
-   ```
-   The API will be available at `http://localhost:5000`
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-   The frontend will be available at `http://localhost:5173`
-
-## Usage
-
-1. Ensure both the Flask backend (port 5000) and React frontend (port 5173) are running
-2. Open your browser and navigate to `http://localhost:5173`
-3. The dashboard will display the latest weather forecasts for Ethiopian cities
-
-## API Endpoints
-
-- `GET /api/weather` - Get all weather forecast data
-- `GET /api/weather/<city>` - Get weather forecast data for a specific city
-- `GET /health` - Health check endpoint
-
-## Technologies Used
-
-- **Frontend**: React, Vite, Axios
-- **Backend**: Flask, SQLite, BeautifulSoup
-- **Data Source**: National Meteorology Agency of Ethiopia (ethiomet.gov.et)
-
-## Development
-
-To build the frontend for production:
 ```bash
-npm run build
+# backend
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python seed_db.py
+export DB_PATH=./NMA_Threedays_forcast_DataBase.db
+uvicorn app.main:app --reload --port 8000
+
+# frontend (new terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-To preview the production build:
+Open http://localhost:5173.
+
+## Quickstart (live Airflow data)
+
+Point the backend at the real DB instead of the seeded one:
+
 ```bash
-npm run preview
+export DB_PATH=~/airflow/harvestedfiles/NMA_Threedays_forcast_DataBase.db
+uvicorn app.main:app --reload --port 8000
 ```
 
-## Testing the Application
-
-Both the backend and frontend servers are now running:
-- Backend API: http://localhost:5000
-- Frontend Dashboard: http://localhost:5173
-
-The dashboard displays weather forecast data for Ethiopian cities in a responsive grid layout with:
-- City names
-- Three-day forecasts with min/max temperatures
-- Weather condition descriptions
-- Visual weather icons
-
-The application automatically fetches data from the backend API and displays it in an easy-to-read format.
+Everything else is unchanged.
