@@ -1,4 +1,5 @@
 import { Search, Layers } from "lucide-react";
+import { motion } from "framer-motion";
 import { COLORS } from "../theme";
 import UnitToggle from "./UnitToggle";
 import SortSelect from "./SortSelect";
@@ -10,10 +11,20 @@ export default function Controls({
   compareMode, setCompareMode, compareCount,
   exportCities,
 }) {
+  const regionVariants = {
+    hidden: { opacity: 0, y: -10 },
+    visible: (index) => ({
+      opacity: 1,
+      y: 0,
+      transition: { delay: index * 0.05 },
+    }),
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-        <div
+        <motion.div
+          whileFocus={{ scale: 1.02 }}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             background: COLORS.panelBg, border: `1px solid ${COLORS.panelBorder}`,
@@ -27,12 +38,14 @@ export default function Controls({
             placeholder="Search a city..."
             style={{ background: "transparent", border: "none", outline: "none", color: COLORS.text, fontSize: 14, width: "100%" }}
           />
-        </div>
+        </motion.div>
 
         <SortSelect sortBy={sortBy} setSortBy={setSortBy} />
         <UnitToggle unit={unit} setUnit={setUnit} />
 
-        <button
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => setCompareMode(!compareMode)}
           style={{
             display: "flex", alignItems: "center", gap: 6,
@@ -45,15 +58,21 @@ export default function Controls({
         >
           <Layers size={14} />
           Compare{compareMode && compareCount ? ` (${compareCount})` : ""}
-        </button>
+        </motion.button>
 
         <ExportButton cities={exportCities} />
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {regions.map((r) => (
-          <button
+        {regions.map((r, index) => (
+          <motion.button
             key={r}
+            custom={index}
+            variants={regionVariants}
+            initial="hidden"
+            animate="visible"
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setRegion(r)}
             className="chip"
             style={{
@@ -66,7 +85,7 @@ export default function Controls({
             }}
           >
             {r}
-          </button>
+          </motion.button>
         ))}
       </div>
     </div>

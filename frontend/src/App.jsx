@@ -1,11 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
 import Header from "./components/Header";
 import HeroPanel from "./components/HeroPanel";
 import Controls from "./components/Controls";
 import CityGrid from "./components/CityGrid";
 import AlertsBanner from "./components/AlertsBanner";
+import AdvancedChart from "./components/AdvancedChart";
 import { fetchForecast } from "./api/forecast";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { useDebounce } from "./hooks/useDebounce";
 import { COLORS } from "./theme";
 
 const MAX_COMPARE = 4;
@@ -23,6 +26,7 @@ export default function App() {
   const [isLive, setIsLive] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 300); // Debounce search with 300ms delay
   const [region, setRegion] = useState("All regions");
   const [sortBy, setSortBy] = useState("name");
   const [unit, setUnit] = useLocalStorage("nma-unit", "C");
@@ -46,12 +50,12 @@ export default function App() {
   const filtered = useMemo(() => {
     if (!forecast) return [];
     const matches = forecast.cities.filter((c) => {
-      const matchesQuery = c.name.toLowerCase().includes(query.toLowerCase());
+      const matchesQuery = c.name.toLowerCase().includes(debouncedQuery.toLowerCase());
       const matchesRegion = region === "All regions" || c.region === region;
       return matchesQuery && matchesRegion;
     });
     return sortCities(matches, sortBy);
-  }, [forecast, query, region, sortBy]);
+  }, [forecast, debouncedQuery, region, sortBy]);
 
   // Pinned cities always show first, in their own row, unaffected by sort.
   const pinnedCities = useMemo(
@@ -86,47 +90,90 @@ export default function App() {
   const hero = forecast.cities.find((c) => c.id === selectedId) || forecast.cities[0];
   const compareCities = forecast.cities.filter((c) => compareIds.includes(c.id));
 
+  // Framer Motion variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: "easeOut" },
+    },
+  };
+
   return (
-    <div style={{ minHeight: "100%", padding: 0 }}>
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      style={{ minHeight: "100%", padding: 0 }}
+    >
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 64px" }}>
-        <Header asOf={forecast.as_of} isLive={isLive} />
+        <motion.div variants={itemVariants}>
+          <Header asOf={forecast.as_of} isLive={isLive} />
+        </motion.div>
 
-        <AlertsBanner cities={forecast.cities} unit={unit} onSelectCity={setSelectedId} />
+        <motion.div variants={itemVariants}>
+          <AlertsBanner cities={forecast.cities} unit={unit} onSelectCity={setSelectedId} />
+        </motion.div>
 
-        <HeroPanel city={hero} compareCities={compareMode ? compareCities : null} unit={unit} />
+        <motion.div variants={itemVariants}>
+          <HeroPanel city={hero} compareCities={compareMode ? compareCities : null} unit={unit} />
+        </motion.div>
 
-        <Controls
-          query={query} setQuery={setQuery}
-          region={region} setRegion={setRegion} regions={regions}
-          unit={unit} setUnit={setUnit}
-          sortBy={sortBy} setSortBy={setSortBy}
-          compareMode={compareMode}
-          setCompareMode={(v) => { setCompareMode(v); if (!v) setCompareIds([]); }}
-          compareCount={compareIds.length}
-          exportCities={[...pinnedCities, ...restCities]}
-        />
+        <motion.div variants={itemVariants}>
+          <AdvancedChart city={hero} compareCities={compareMode ? compareCities : []} unit={unit} />
+        </motion.div>
+
+        <motion.div variants={itemVariants}>
+          <Controls
+            query={query} setQuery={setQuery}
+            region={region} setRegion={setRegion} regions={regions}
+            unit={unit} setUnit={setUnit}
+            sortBy={sortBy} setSortBy={setSortBy}
+            compareMode={compareMode}
+            setCompareMode={(v) => { setCompareMode(v); if (!v) setCompareIds([]); }}
+            compareCount={compareIds.length}
+            exportCities={[...pinnedCities, ...restCities]}
+          />
+        </motion.div>
 
         {pinnedCities.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
+          <motion.div variants={itemVariants} style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 12.5, color: COLORS.textMuted, marginBottom: 8 }}>Pinned</div>
             <CityGrid
               cities={pinnedCities} selectedId={hero.id} onSelect={setSelectedId} query={query} region={region} unit={unit}
               pinnedIds={pinnedIds} onTogglePin={togglePin}
               compareMode={compareMode} compareIds={compareIds} onToggleCompare={toggleCompare}
             />
-          </div>
+          </motion.div>
         )}
 
-        <CityGrid
-          cities={restCities} selectedId={hero.id} onSelect={setSelectedId} query={query} region={region} unit={unit}
-          pinnedIds={pinnedIds} onTogglePin={togglePin}
-          compareMode={compareMode} compareIds={compareIds} onToggleCompare={toggleCompare}
-        />
+        <motion.div variants={itemVariants}>
+          <CityGrid
+            cities={restCities} selectedId={hero.id} onSelect={setSelectedId} query={query} region={region} unit={unit}
+            pinnedIds={pinnedIds} onTogglePin={togglePin}
+            compareMode={compareMode} compareIds={compareIds} onToggleCompare={toggleCompare}
+          />
+        </motion.div>
 
-        <div style={{ marginTop: 36, paddingTop: 16, borderTop: `1px solid ${COLORS.panelBorder}`, fontSize: 12.5, color: COLORS.textSubtle }}>
+        <motion.div
+          variants={itemVariants}
+          style={{ marginTop: 36, paddingTop: 16, borderTop: `1px solid ${COLORS.panelBorder}`, fontSize: 12.5, color: COLORS.textSubtle }}
+        >
           Source: {forecast.source}. {!isLive && "Showing bundled sample data — start the FastAPI backend to see live NMA figures."}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
