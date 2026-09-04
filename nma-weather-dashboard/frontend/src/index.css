@@ -1,0 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: #122024;
+}
+
+body {
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  color: #F1EDE2;
+}
+
+.sg { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
+
+.card-btn { transition: transform 120ms ease, border-color 120ms ease; }
+.card-btn:hover { transform: translateY(-2px); border-color: #E8A33D; }
+.card-btn:focus-visible { outline: 2px solid #E8A33D; outline-offset: 2px; }
+
+.chip { transition: background 120ms ease, color 120ms ease; }
+
+input::placeholder { color: #9BB0AE; }
