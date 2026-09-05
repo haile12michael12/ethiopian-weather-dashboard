@@ -1,38 +1,53 @@
 # ethiopian Weather Dashboard
 
 Full-stack project built around the existing Airflow scraper
-(`airflow/NMA_web_Scrapping.py`), which pulls Ethiopia's National
+(`ingestion/airflow/Scrapping.py`), which pulls Ethiopia's National
 Meteorology Agency three-day forecast into a SQLite table
 (`NMAthreedaysForcasetData`) once a day.
 
 ```
 ethiopian-weather-dashboard/
-├── airflow/
-│   └── web_scrapping.py   # your existing DAG, unmodified
-├── backend/                    # FastAPI service reading the SQLite table
+├── ingestion/
+│   └── airflow/
+│       └── Scrapping.py       # Airflow ingestion job
+├── backend/                   # FastAPI service and data pipeline
 │   ├── app/
 │   │   ├── main.py
 │   │   ├── database.py
 │   │   ├── models.py
 │   │   ├── regions.py
-│   │   └── routes/forecast.py
-│   ├── seed_db.py               # local sample DB for dev/testing
+│   │   ├── agro.py
+│   │   ├── alerts.py
+│   │   ├── timeseries.py
+│   │   ├── pipeline/
+│   │   ├── notifications/
+│   │   └── routes/
+│   ├── tests/
+│   ├── seed_db.py
+│   ├── run_pipeline.py
+│   ├── run_telegram_bot.py
 │   ├── requirements.txt
 │   └── README.md
-└── frontend/                   # React + Vite dashboard
-    ├── src/
-    │   ├── App.jsx
-    │   ├── theme.js
-    │   ├── api/forecast.js
-    │   ├── data/sampleCities.js
-    │   └── components/
-    ├── package.json
-    └── README.md
+├── frontend/                  # React + Vite dashboard
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── theme.js
+│   │   ├── api/
+│   │   ├── data/
+│   │   ├── hooks/
+│   │   ├── utils/
+│   │   └── components/
+│   ├── public/sw.js
+│   ├── package.json
+│   └── README.md
+├── docker-compose.yml
+├── docs/
+└── README.md
 ```
 
 ## How the pieces connect
 
-1. **Airflow DAG** (`airflow/web_scrapping.py`) runs daily, scrapes
+1. **Airflow ingestion job** (`ingestion/airflow/Scrapping.py`) runs daily, scrapes
    ethiomet.gov.et, and appends a row per city to
    `~/airflow/harvestedfiles/NMA_Threedays_forcast_DataBase.db`.
 2. **Backend** (`backend/`) is a small FastAPI service that reads the
