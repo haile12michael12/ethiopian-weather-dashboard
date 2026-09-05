@@ -1,3 +1,11 @@
+"""
+Airflow DAG: Resilient Ethiopian Weather Ingestion Pipeline.
+Performs:
+1. Primary NMA scrape attempt (ethiomet.gov.et)
+2. Automated Pydantic data quality and anomaly checks
+3. Secondary fallback ingestion via Open-Meteo API when NMA is unavailable or incomplete
+4. Atomic storage into PostgreSQL/TimescaleDB or SQLite
+"""
 import os
 import json
 import requests
@@ -7,6 +15,10 @@ import requests.exceptions as requests_exceptions
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 import save_metadata as Metadata
+import sys
+import logging
+from datetime import datetime
+import pendulum
 from airflow.decorators import dag, task
 import pendulum
 import csv
@@ -15,7 +27,13 @@ from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 from airflow.providers.sqlite.hooks.sqlite import SqliteHook
 
 from bs4 import BeautifulSoup
+# Add project root and backend to python path for task execution
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BACKEND_DIR = os.path.join(PROJECT_ROOT, "backend")
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
+logger = logging.getLogger(__name__)
 
 forcast_URL = 'http://www.ethiomet.gov.et/forecasts/three_day_forecast' 
 home_directory = os.path.expanduser( '~' )
@@ -23,12 +41,16 @@ forcast_FOLDER = os.path.join(home_directory, "airflow","harvestedfiles")
 
 @dag(
     dag_id='NMA_threeDays_forcast_data_scraper',
+    dag_id="NMA_threeDays_forcast_data_scraper",
     schedule_interval="@daily",
     start_date=pendulum.datetime(2022, 5, 30),
     tags=['scrap three days weather forcast everyday from National Methrology Agency'],
+    tags=["ethiopia", "weather", "nma", "resilient_pipeline", "timescaledb"],
     catchup=False,
+    max_active_runs=1,
 )
 def nma_web_scrapper():
+def resilient_ethiopian_weather_pipeline():
 
     @task()
     def get_forcasts_scraper():
@@ -52,6 +74,15 @@ def nma_web_scrapper():
         filename = f"NMA Three Day Forecast {tages_AsofDate}.csv"
         df_csv_file = f'TemporaryFile.csv'
         file_path = os.path.join(forcast_FOLDER, filename)
+    def fetch_primary_nma() -> dict:
+        """Attempts to scrape Ethiopian National Meteorology Agency portal."""
+        from app.pipeline.sources.nma import fetch_nma_forecast, NMAScraperError
+        try:
+            records = fetch_nma_forecast(max_retries=2, retry_delay=1.0)
+            return {"status": "success", "records": records, "source": "NMA"}
+        except (NMAScraperError, Exception) as exc:
+            logger.warning(f"Primary NMA portal unavailable: {exc}")
+            return {"status": "failed", "records": [], "error": str(exc), "source": "NMA"}
 
         tages_between_specifc = tages_between.find_all('img')
         data=[]
@@ -108,3 +139,91 @@ def nma_web_scrapper():
     forcast_dailydata = get_forcasts_scraper()
   
 scrapping = nma_web_scrapper()
+    @task()
+    def validate_and_fallback_open_meteo(nma_result: dict) -> list:
+        """Runs quality checks and fetches Open-Meteo fallback for any missing or failed cities."""
+        from app.pipeline.cities import ETHIOPIAN_CITIES
+        from app.pipeline.sources.open_meteo import fetch_all_cities_open_meteo
+        from app.pipeline.quality import validate_batch
+
+        records = nma_result.get("records", [])
+        found_cities = {r["City"] for r in records}
+        target_cities = set(ETHIOPIAN_CITIES.keys())
+        missing_cities = target_cities - found_cities
+
+        if missing_cities:
+            logger.info(f"Triggering Open-Meteo fallback for {len(missing_cities)} cities: {missing_cities}")
+            fallback_records = fetch_all_cities_open_meteo(cities=list(missing_cities))
+            records.extend(fallback_records)
+
+        # Run records through Pydantic data quality and anomaly validation
+        validated, report = validate_batch(records)
+        logger.info(f"Quality validation complete. Verified: {report.verified}, Corrected: {report.corrected}, Rejected: {report.rejected}")
+
+        return [v.to_dict() for v in validated]
+
+    @task()
+    def persist_to_database(validated_records: list) -> dict:
+        """Stores validated forecasts into PostgreSQL/TimescaleDB or SQLite."""
+        from app.database import get_connection, init_db, is_postgres
+
+        init_db()
+        if not validated_records:
+            raise ValueError("No valid forecast records to persist.")
+
+        with get_connection() as conn:
+            for d in validated_records:
+                conn.execute(
+                    """
+                    INSERT INTO weather_forecasts (
+                        City, MinTempD1, MaxTempD1, WeatherConditionD1, RainPercentD1, WindD1,
+                        MinTempD2, MaxTempD2, WeatherConditionD2, RainPercentD2, WindD2,
+                        MinTempD3, MaxTempD3, WeatherConditionD3, RainPercentD3, WindD3,
+                        DataSource, QualityStatus
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        d["City"], d["MinTempD1"], d["MaxTempD1"], d["WeatherConditionD1"], d["RainPercentD1"], d["WindD1"],
+                        d["MinTempD2"], d["MaxTempD2"], d["WeatherConditionD2"], d["RainPercentD2"], d["WindD2"],
+                        d["MinTempD3"], d["MaxTempD3"], d["WeatherConditionD3"], d["RainPercentD3"], d["WindD3"],
+                        d["DataSource"], d["QualityStatus"]
+                    )
+                )
+
+                if not is_postgres():
+                    conn.execute(
+                        """
+                        INSERT INTO NMAthreedaysForcasetData (
+                            City, MinTempD1, MaxTempD1, WeatherConditionD1, RainPercentD1, WindD1,
+                            MinTempD2, MaxTempD2, WeatherConditionD2, RainPercentD2, WindD2,
+                            MinTempD3, MaxTempD3, WeatherConditionD3, RainPercentD3, WindD3,
+                            DataSource, QualityStatus
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            d["City"], d["MinTempD1"], d["MaxTempD1"], d["WeatherConditionD1"], d["RainPercentD1"], d["WindD1"],
+                            d["MinTempD2"], d["MaxTempD2"], d["WeatherConditionD2"], d["RainPercentD2"], d["WindD2"],
+                            d["MinTempD3"], d["MaxTempD3"], d["WeatherConditionD3"], d["RainPercentD3"], d["WindD3"],
+                            d["DataSource"], d["QualityStatus"]
+                        )
+                    )
+
+            conn.commit()
+
+        nma_count = sum(1 for r in validated_records if r["DataSource"] == "NMA")
+        fallback_count = sum(1 for r in validated_records if r["DataSource"] != "NMA")
+
+        return {
+            "total_saved": len(validated_records),
+            "nma_count": nma_count,
+            "fallback_count": fallback_count,
+            "persisted_at": datetime.utcnow().isoformat(),
+        }
+
+    # Pipeline task dependencies
+    nma_data = fetch_primary_nma()
+    validated_data = validate_and_fallback_open_meteo(nma_data)
+    persist_to_database(validated_data)
+
+
+scrapping = resilient_ethiopian_weather_pipeline()

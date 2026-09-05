@@ -91,6 +91,9 @@ class CityForecast(BaseModel):
     region: Optional[str] = None
     days: List[DayForecast]
     alerts: List[WeatherAlert] = []
+    data_source: Optional[str] = "NMA"
+    quality_status: Optional[str] = "verified"
+    recorded_at: Optional[str] = None
 
 
 class HistoricalTrendsResponse(BaseModel):
@@ -105,8 +108,24 @@ class HistoricalTrendsResponse(BaseModel):
 class ForecastResponse(BaseModel):
     as_of: Optional[str] = None
     source: str = "National Meteorology Agency"
+    data_source: Optional[str] = "NMA"
+    fallback_active: bool = False
+    database_type: Optional[str] = "SQLite"
     cities: List[CityForecast]
     alerts: List[WeatherAlert] = []
+
+
+class PipelineStatusResponse(BaseModel):
+    """Status of the weather data pipeline and multi-source ensembling"""
+    database_type: str
+    primary_source: str
+    primary_status: str
+    fallback_source: str
+    fallback_active: bool
+    total_records: int
+    latest_recorded_at: Optional[str] = None
+    cities_count: int = 0
+    quality_summary: Optional[dict] = None
 
 
 class CityComparisonResponse(BaseModel):

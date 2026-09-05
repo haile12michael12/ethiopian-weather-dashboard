@@ -121,6 +121,13 @@ export default function App() {
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 64px" }}>
         <motion.div variants={itemVariants}>
           <Header asOf={forecast.as_of} isLive={isLive} />
+          <Header
+            asOf={forecast.as_of}
+            isLive={isLive}
+            dataSource={forecast.data_source}
+            fallbackActive={forecast.fallback_active}
+            databaseType={forecast.database_type}
+          />
         </motion.div>
 
         <motion.div variants={itemVariants}>

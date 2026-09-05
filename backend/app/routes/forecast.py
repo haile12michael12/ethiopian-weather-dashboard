@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from ..database import get_connection, table_exists
+from ..database import get_connection, table_exists, get_db_type
 from ..models import (
     ForecastResponse, CityForecast, DayForecast, 
     CityComparisonResponse, PaginatedForecastResponse,
     TimeSeriesResponse, HistoricalTrendsResponse
+    TimeSeriesResponse, HistoricalTrendsResponse,
+    PipelineStatusResponse
 )
 from ..alerts import detect_alerts, detect_all_alerts
 from ..timeseries import (
@@ -27,6 +30,8 @@ def _build_day_forecast(row: dict, day_num: int) -> DayForecast:
         condition=row[f"WeatherConditionD{day_num}"],
         rain_percent=row.get(f"RainPercentD{day_num}", 0),
         wind=row.get(f"WindD{day_num}", 0)
+        rain_percent=row.get(f"RainPercentD{day_num}", 0) or 0,
+        wind=row.get(f"WindD{day_num}", 0) or 0
     )
 
 
@@ -38,6 +43,10 @@ def _build_city_forecast(row: dict) -> CityForecast:
         name=row["City"],
         region=region_for(row["City"]),
         days=days
+        days=days,
+        data_source=row.get("DataSource") or "NMA",
+        quality_status=row.get("QualityStatus") or "verified",
+        recorded_at=str(row.get("RecordedAt")) if row.get("RecordedAt") else None
     )
     # Attach alerts to the city
     city.alerts = detect_alerts(city)
@@ -48,6 +57,7 @@ def _build_city_forecast(row: dict) -> CityForecast:
 def get_forecast():
     """
     Returns the most recent forecast row per city with alerts.
+    Returns the most recent forecast row per city with alerts and data lineage.
     """
     if not table_exists():
         raise HTTPException(
@@ -74,6 +84,90 @@ def get_forecast():
     all_alerts = detect_all_alerts(cities)
 
     return ForecastResponse(cities=cities, alerts=all_alerts)
+    fallback_active = any(c.data_source == "Open-Meteo" for c in cities)
+    dominant_source = "Open-Meteo" if fallback_active else "NMA"
+    source_label = "Open-Meteo (Secondary Fallback)" if fallback_active else "National Meteorology Agency"
+    latest_time = cities[0].recorded_at if cities and cities[0].recorded_at else None
+
+    return ForecastResponse(
+        as_of=latest_time,
+        source=source_label,
+        data_source=dominant_source,
+        fallback_active=fallback_active,
+        database_type=get_db_type(),
+        cities=cities,
+        alerts=all_alerts
+    )
+
+
+@router.get("/pipeline/status", response_model=PipelineStatusResponse)
+def get_pipeline_status():
+    """
+    Returns the real-time status of the weather data pipeline,
+    including database engine, primary source health, fallback status, and quality metrics.
+    """
+    if not table_exists():
+        return PipelineStatusResponse(
+            database_type=get_db_type(),
+            primary_source="National Meteorology Agency (ethiomet.gov.et)",
+            primary_status="uninitialized",
+            fallback_source="Open-Meteo API",
+            fallback_active=False,
+            total_records=0,
+            cities_count=0,
+            quality_summary={"verified": 0, "anomalies": 0}
+        )
+
+    with get_connection() as conn:
+        # Total records count
+        try:
+            total_row = conn.execute("SELECT COUNT(*) FROM weather_forecasts").fetchone()
+            total_records = total_row[0] if total_row else 0
+        except Exception:
+            total_row = conn.execute("SELECT COUNT(*) FROM NMAthreedaysForcasetData").fetchone()
+            total_records = total_row[0] if total_row else 0
+
+        # Latest batch of city forecasts
+        rows = conn.execute(
+            """
+            SELECT t.*
+            FROM NMAthreedaysForcasetData t
+            INNER JOIN (
+                SELECT City, MAX(RecNum) AS max_rec
+                FROM NMAthreedaysForcasetData
+                GROUP BY City
+            ) latest
+            ON t.City = latest.City AND t.RecNum = latest.max_rec
+            ORDER BY t.City ASC
+            """
+        ).fetchall()
+
+    row_dicts = [dict(r) for r in rows]
+    cities_count = len(row_dicts)
+    sources = [r.get("DataSource", "NMA") for r in row_dicts]
+    qualities = [r.get("QualityStatus", "verified") for r in row_dicts]
+    latest_times = [r.get("RecordedAt") for r in row_dicts if r.get("RecordedAt")]
+    latest_time = str(max(latest_times)) if latest_times else None
+
+    fallback_count = sum(1 for s in sources if s == "Open-Meteo")
+    fallback_active = fallback_count > 0
+
+    return PipelineStatusResponse(
+        database_type=get_db_type(),
+        primary_source="National Meteorology Agency (ethiomet.gov.et)",
+        primary_status="offline / redirected" if fallback_active else "operational",
+        fallback_source="Open-Meteo API (ECMWF/GFS)",
+        fallback_active=fallback_active,
+        total_records=total_records,
+        latest_recorded_at=latest_time,
+        cities_count=cities_count,
+        quality_summary={
+            "nma_count": sum(1 for s in sources if s == "NMA"),
+            "fallback_count": fallback_count,
+            "verified_count": sum(1 for q in qualities if q == "verified"),
+            "corrected_count": sum(1 for q in qualities if q == "corrected"),
+        }
+    )
 
 
 @router.get("/forecast/{city_name}", response_model=CityForecast)
