@@ -1,6 +1,5 @@
 import { COLORS } from "../theme";
 
-export default function Header({ asOf, isLive }) {
 export default function Header({ asOf, isLive, dataSource, fallbackActive, databaseType }) {
   const isFallback = fallbackActive || dataSource === "Open-Meteo";
 
@@ -16,8 +15,6 @@ export default function Header({ asOf, isLive, dataSource, fallbackActive, datab
       }}
     >
       <div>
-        <div className="sg" style={{ fontSize: 13, letterSpacing: "0.02em", color: COLORS.accent, marginBottom: 6 }}>
-          National Meteorology Agency &middot; Three-Day Outlook
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <span className="sg" style={{ fontSize: 13, letterSpacing: "0.02em", color: COLORS.accent }}>
             National Meteorology Agency &middot; Three-Day Outlook

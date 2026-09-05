@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "./components/Header";
+import Navbar from "./components/Navbar";
 import HeroPanel from "./components/HeroPanel";
 import Controls from "./components/Controls";
 import CityGrid from "./components/CityGrid";
@@ -118,9 +119,14 @@ export default function App() {
       variants={containerVariants}
       style={{ minHeight: "100%", padding: 0 }}
     >
+      <Navbar
+        isLive={isLive}
+        dataSource={forecast.data_source}
+        fallbackActive={forecast.fallback_active}
+        cities={forecast.cities}
+      />
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 64px" }}>
-        <motion.div variants={itemVariants}>
-          <Header asOf={forecast.as_of} isLive={isLive} />
+        <motion.div variants={itemVariants} id="overview">
           <Header
             asOf={forecast.as_of}
             isLive={isLive}
@@ -130,11 +136,11 @@ export default function App() {
           />
         </motion.div>
 
-        <motion.div variants={itemVariants}>
+        <motion.div variants={itemVariants} id="alerts">
           <AlertsBanner cities={forecast.cities} unit={unit} onSelectCity={setSelectedId} />
         </motion.div>
 
-        <motion.div variants={itemVariants}>
+        <motion.div variants={itemVariants} id="forecast">
           <HeroPanel city={hero} compareCities={compareMode ? compareCities : null} unit={unit} />
         </motion.div>
 

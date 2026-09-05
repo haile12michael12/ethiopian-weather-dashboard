@@ -130,6 +130,34 @@ def run_resilient_ingest() -> PipelineMetrics:
 
         conn.commit()
 
+    # Step 5: Automated Real-Time Emergency Alert Dispatch
+    try:
+        from ..models import CityForecast, DayForecast
+        from ..notifications.dispatcher import dispatch_alerts_for_cities
+        from ..regions import region_for
+
+        city_forecasts = []
+        for r in validated_records:
+            days = [
+                DayForecast(label="Today", min=r.min_temp_d1, max=r.max_temp_d1, condition=r.condition_d1, rain_percent=r.rain_percent_d1, wind=r.wind_d1),
+                DayForecast(label="Tomorrow", min=r.min_temp_d2, max=r.max_temp_d2, condition=r.condition_d2, rain_percent=r.rain_percent_d2, wind=r.wind_d2),
+                DayForecast(label="Day 3", min=r.min_temp_d3, max=r.max_temp_d3, condition=r.condition_d3, rain_percent=r.rain_percent_d3, wind=r.wind_d3),
+            ]
+            cf = CityForecast(
+                id=0,
+                name=r.city,
+                region=region_for(r.city),
+                days=days,
+                data_source=r.data_source,
+                quality_status=r.quality_status
+            )
+            city_forecasts.append(cf)
+
+        dispatch_results = dispatch_alerts_for_cities(city_forecasts)
+        logger.info(f"Automated alert dispatch results: {dispatch_results}")
+    except Exception as exc:
+        logger.warning(f"Alert dispatch non-fatal failure: {exc}")
+
     metrics.total_ingested = len(validated_records)
     logger.info(
         f"Pipeline ingest complete. Total: {metrics.total_ingested} "

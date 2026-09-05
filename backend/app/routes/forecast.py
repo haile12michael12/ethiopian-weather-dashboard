@@ -1,11 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
-from ..database import get_connection, table_exists
 from ..database import get_connection, table_exists, get_db_type
 from ..models import (
     ForecastResponse, CityForecast, DayForecast, 
     CityComparisonResponse, PaginatedForecastResponse,
-    TimeSeriesResponse, HistoricalTrendsResponse
     TimeSeriesResponse, HistoricalTrendsResponse,
     PipelineStatusResponse
 )
@@ -28,8 +26,6 @@ def _build_day_forecast(row: dict, day_num: int) -> DayForecast:
         min=row[f"MinTempD{day_num}"],
         max=row[f"MaxTempD{day_num}"],
         condition=row[f"WeatherConditionD{day_num}"],
-        rain_percent=row.get(f"RainPercentD{day_num}", 0),
-        wind=row.get(f"WindD{day_num}", 0)
         rain_percent=row.get(f"RainPercentD{day_num}", 0) or 0,
         wind=row.get(f"WindD{day_num}", 0) or 0
     )
@@ -42,7 +38,6 @@ def _build_city_forecast(row: dict) -> CityForecast:
         id=row["RecNum"],
         name=row["City"],
         region=region_for(row["City"]),
-        days=days
         days=days,
         data_source=row.get("DataSource") or "NMA",
         quality_status=row.get("QualityStatus") or "verified",
@@ -56,7 +51,6 @@ def _build_city_forecast(row: dict) -> CityForecast:
 @router.get("/forecast", response_model=ForecastResponse)
 def get_forecast():
     """
-    Returns the most recent forecast row per city with alerts.
     Returns the most recent forecast row per city with alerts and data lineage.
     """
     if not table_exists():
@@ -83,7 +77,6 @@ def get_forecast():
     cities = [_build_city_forecast(dict(row)) for row in rows]
     all_alerts = detect_all_alerts(cities)
 
-    return ForecastResponse(cities=cities, alerts=all_alerts)
     fallback_active = any(c.data_source == "Open-Meteo" for c in cities)
     dominant_source = "Open-Meteo" if fallback_active else "NMA"
     source_label = "Open-Meteo (Secondary Fallback)" if fallback_active else "National Meteorology Agency"
@@ -541,3 +534,102 @@ def get_city_statistics(
     stats = calculate_historical_stats(records)
     
     return stats
+
+
+@router.get("/agro/overview")
+def get_agro_overview():
+    """
+    Returns nationwide agricultural season status and agro-meteorological advisories.
+    """
+    from ..agro import calculate_current_season, generate_city_agro_advisory
+    from ..pipeline.cities import ETHIOPIAN_CITIES
+
+    season = calculate_current_season()
+
+    if not table_exists():
+        return {
+            "current_season": season,
+            "cities_evaluated": 0,
+            "national_alerts": [],
+            "regional_summaries": {}
+        }
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT t.*
+            FROM NMAthreedaysForcasetData t
+            INNER JOIN (
+                SELECT City, MAX(RecNum) AS max_rec
+                FROM NMAthreedaysForcasetData
+                GROUP BY City
+            ) latest
+            ON t.City = latest.City AND t.RecNum = latest.max_rec
+            ORDER BY t.City ASC
+            """
+        ).fetchall()
+
+    city_advisories = []
+    national_alerts = []
+
+    for row in rows:
+        r = dict(row)
+        city_name = r["City"]
+        day1 = {
+            "min": r.get("MinTempD1", 12),
+            "max": r.get("MaxTempD1", 24),
+            "condition": r.get("WeatherConditionD1", "Partly Cloudy"),
+            "rain_percent": r.get("RainPercentD1", 0),
+            "wind": r.get("WindD1", 0)
+        }
+        adv = generate_city_agro_advisory(city_name, day1)
+        city_advisories.append(adv)
+
+        if adv.frost_alert:
+            national_alerts.append(f"❄️ Frost alert in {city_name} ({adv.elevation}m)")
+        if adv.heat_stress_alert:
+            national_alerts.append(f"🌡️ Heat stress alert for livestock in {city_name}")
+        if adv.waterlogging_risk:
+            national_alerts.append(f"🌊 Field waterlogging risk in {city_name}")
+
+    return {
+        "current_season": season,
+        "cities_evaluated": len(city_advisories),
+        "national_alerts": national_alerts,
+        "sample_advisories": [adv.model_dump() for adv in city_advisories[:6]]
+    }
+
+
+@router.get("/agro/{city_name}")
+def get_city_agro_advisory_endpoint(city_name: str):
+    """
+    Get detailed agro-meteorological advisory for a specific Ethiopian city.
+    """
+    from ..agro import generate_city_agro_advisory
+
+    if not table_exists():
+        raise HTTPException(status_code=503, detail="Forecast table not found")
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT * FROM NMAthreedaysForcasetData
+            WHERE City = ?
+            ORDER BY RecNum DESC LIMIT 1
+            """,
+            (city_name,),
+        ).fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"No forecast found for '{city_name}'")
+
+    r = dict(row)
+    day1 = {
+        "min": r.get("MinTempD1", 12),
+        "max": r.get("MaxTempD1", 24),
+        "condition": r.get("WeatherConditionD1", "Partly Cloudy"),
+        "rain_percent": r.get("RainPercentD1", 0),
+        "wind": r.get("WindD1", 0)
+    }
+
+    return generate_city_agro_advisory(city_name, day1)
