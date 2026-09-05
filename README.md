@@ -5,6 +5,8 @@ Full-stack project built around the existing Airflow scraper
 Meteorology Agency three-day forecast into a SQLite table
 (`NMAthreedaysForcasetData`) once a day.
 
+![Ethiopian Weather Dashboard](image.PNG)
+
 ```
 ethiopian-weather-dashboard/
 ├── ingestion/
