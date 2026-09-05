@@ -1,4 +1,4 @@
-# NMA Weather Dashboard
+# ethiopian Weather Dashboard
 
 Full-stack project built around the existing Airflow scraper
 (`airflow/NMA_web_Scrapping.py`), which pulls Ethiopia's National
@@ -6,9 +6,9 @@ Meteorology Agency three-day forecast into a SQLite table
 (`NMAthreedaysForcasetData`) once a day.
 
 ```
-nma-weather-dashboard/
+ethiopian-weather-dashboard/
 ├── airflow/
-│   └── NMA_web_Scrapping.py   # your existing DAG, unmodified
+│   └── web_scrapping.py   # your existing DAG, unmodified
 ├── backend/                    # FastAPI service reading the SQLite table
 │   ├── app/
 │   │   ├── main.py
@@ -32,7 +32,7 @@ nma-weather-dashboard/
 
 ## How the pieces connect
 
-1. **Airflow DAG** (`airflow/NMA_web_Scrapping.py`) runs daily, scrapes
+1. **Airflow DAG** (`airflow/web_scrapping.py`) runs daily, scrapes
    ethiomet.gov.et, and appends a row per city to
    `~/airflow/harvestedfiles/NMA_Threedays_forcast_DataBase.db`.
 2. **Backend** (`backend/`) is a small FastAPI service that reads the
