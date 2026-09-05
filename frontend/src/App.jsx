@@ -7,6 +7,7 @@ import Controls from "./components/Controls";
 import CityGrid from "./components/CityGrid";
 import AlertsBanner from "./components/AlertsBanner";
 import AdvancedChart from "./components/AdvancedChart";
+import Footer from "./components/Footer";
 import { fetchForecast } from "./api/forecast";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { useDebounce } from "./hooks/useDebounce";
@@ -187,6 +188,7 @@ export default function App() {
           Source: {forecast.source}. {!isLive && "Showing bundled sample data — start the FastAPI backend to see live NMA figures."}
         </motion.div>
       </div>
+      <Footer source={forecast.source} isLive={isLive} />
     </motion.div>
   );
 }
