@@ -1,7 +1,7 @@
-# NMA Weather API
+# Weather API
 
-FastAPI service that reads the SQLite table the `NMA_web_Scrapping.py`
-Airflow DAG writes (`NMAthreedaysForcasetData`) and exposes it as JSON for
+FastAPI service that reads the SQLite table the `web_scrapping.py`
+Airflow DAG writes (`threedaysForcasetData`) and exposes it as JSON for
 the React dashboard.
 
 ## Setup
@@ -23,7 +23,7 @@ uvicorn app.main:app --reload --port 8000
 
 ```bash
 python seed_db.py
-export DB_PATH=./NMA_Threedays_forcast_DataBase.db
+export DB_PATH=./Threedays_forcast_DataBase.db
 uvicorn app.main:app --reload --port 8000
 ```
 

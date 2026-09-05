@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .routes.forecast import router as forecast_router
 
 app = FastAPI(
-    title="NMA Weather API",
-    description="Serves the SQLite table populated by the NMA_web_Scrapping Airflow DAG.",
+    title=" Weather API",
+    description="Serves the SQLite table populated by the web_scrapping Airflow DAG.",
     version="1.0.0",
 )
 

@@ -1,8 +1,8 @@
 """
 SQLite access layer.
 
-Points at the database file the Airflow DAG (NMA_web_Scrapping.py) writes to:
-  ~/airflow/harvestedfiles/NMA_Threedays_forcast_DataBase.db
+Points at the database file the Airflow DAG (web_scrapping.py) writes to:
+  ~/airflow/harvestedfiles/Threedays_forcast_DataBase.db
 
 Override the path with the DB_PATH environment variable, e.g. when running
 the API next to a copy of the file instead of on the Airflow host.
@@ -12,7 +12,7 @@ import sqlite3
 from contextlib import contextmanager
 
 DEFAULT_DB_PATH = os.path.join(
-    os.path.expanduser("~"), "airflow", "harvestedfiles", "NMA_Threedays_forcast_DataBase.db"
+    os.path.expanduser("~"), "airflow", "harvestedfiles", "Threedays_forcast_DataBase.db"
 )
 DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
 
@@ -30,6 +30,6 @@ def get_connection():
 def table_exists() -> bool:
     with get_connection() as conn:
         cur = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='NMAthreedaysForcasetData'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='threedaysForcasetData'"
         )
         return cur.fetchone() is not None

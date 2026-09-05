@@ -1,5 +1,5 @@
 """
-Creates a local NMA_Threedays_forcast_DataBase.db with sample rows so the
+Creates a local Threedays_forcast_DataBase.db with sample rows so the
 API and frontend can be run/tested without waiting on a real Airflow DAG run.
 
 Usage:
@@ -8,7 +8,7 @@ Usage:
 import os
 import sqlite3
 
-DB_PATH = os.environ.get("DB_PATH", "./NMA_Threedays_forcast_DataBase.db")
+DB_PATH = os.environ.get("DB_PATH", "./Threedays_forcast_DataBase.db")
 
 SAMPLE_ROWS = [
     # City, MinD1, MaxD1, CondD1, MinD2, MaxD2, CondD2, MinD3, MaxD3, CondD3
@@ -30,7 +30,7 @@ SAMPLE_ROWS = [
 ]
 
 CREATE_TABLE = """
-CREATE TABLE IF NOT EXISTS NMAthreedaysForcasetData(
+CREATE TABLE IF NOT EXISTS threedaysForcasetData(
     RecNum INTEGER PRIMARY KEY AUTOINCREMENT,
     City TEXT,
     MinTempD1 INTEGER,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS NMAthreedaysForcasetData(
 """
 
 INSERT = """
-INSERT INTO NMAthreedaysForcasetData
+INSERT INTO threedaysForcasetData
 (City, MinTempD1, MaxTempD1, WeatherConditionD1, MinTempD2, MaxTempD2, WeatherConditionD2, MinTempD3, MaxTempD3, WeatherConditionD3)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """

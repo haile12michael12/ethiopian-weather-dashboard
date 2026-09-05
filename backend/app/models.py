@@ -85,6 +85,14 @@ class TimeSeriesResponse(BaseModel):
     period: str
 
 
+class CityForecast(BaseModel):
+    id: int
+    name: str
+    region: Optional[str] = None
+    days: List[DayForecast]
+    alerts: List[WeatherAlert] = []
+
+
 class HistoricalTrendsResponse(BaseModel):
     """Response for historical trends"""
     city_name: str
@@ -92,14 +100,6 @@ class HistoricalTrendsResponse(BaseModel):
     historical_stats: HistoricalStats
     trend_analysis: TrendAnalysisResponse
     recommendations: List[str] = []
-
-
-class CityForecast(BaseModel):
-    id: int
-    name: str
-    region: Optional[str] = None
-    days: List[DayForecast]
-    alerts: List[WeatherAlert] = []
 
 
 class ForecastResponse(BaseModel):
